@@ -97,7 +97,7 @@ func initClient(c *cli.Context) error {
 		config.PEMKeyPath = c.String("key_path")
 	}
 
-	if client, err = gitkit.New(config, nil); err != nil {
+	if client, err = gitkit.New(config); err != nil {
 		return err
 	}
 	return nil
@@ -184,10 +184,15 @@ func commandValidateToken() cli.Command {
 		Description: "Validate the given ID token and print the account information contained in it.",
 		Action: func(c *cli.Context) {
 			failOnError(c, checkOneArgument(c))
-			u, err := client.ValidateToken(c.Args().First())
+			t, err := client.ValidateToken(c.Args().First())
 			failOnError(c, err)
 			fmt.Println(">> token info:")
-			printUser(u)
+			printUser(&gitkit.User{
+				LocalID:       t.LocalID,
+				Email:         t.Email,
+				EmailVerified: t.EmailVerified,
+				ProviderID:    t.ProviderID,
+			})
 		},
 	}
 }
