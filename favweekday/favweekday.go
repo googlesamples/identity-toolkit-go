@@ -16,9 +16,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
-	"appengine"
-	"appengine/datastore"
-	"appengine/mail"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	aelog "google.golang.org/appengine/log"
+	"google.golang.org/appengine/mail"
 )
 
 // Templates file path.
@@ -130,7 +131,7 @@ func currentUser(r *http.Request) *User {
 		// Create an identity toolkit client associated with the GAE context.
 		client, err := gitkit.NewWithContext(c, gitkitClient)
 		if err != nil {
-			c.Errorf("Failed to create a gitkit.Client with a context: %s", err)
+			aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
 			return nil
 		}
 
@@ -143,17 +144,17 @@ func currentUser(r *http.Request) *User {
 		// minitues old even if it's still valid.
 		token, err := client.ValidateToken(ts)
 		if err != nil {
-			c.Errorf("Invalid token %s: %s", ts, err)
+			aelog.Errorf(c, "Invalid token %s: %s", ts, err)
 			return nil
 		}
 		if time.Now().Sub(token.IssueAt) > 15*time.Minute {
-			c.Infof("Token %s is too old. Issused at: %s", ts, token.IssueAt)
+			aelog.Infof(c, "Token %s is too old. Issused at: %s", ts, token.IssueAt)
 			return nil
 		}
 		// Fetch user info.
 		u, err := client.UserByLocalID(token.LocalID)
 		if err != nil {
-			c.Errorf("Failed to fetch user info for %s[%s]: %s", token.Email, token.LocalID, err)
+			aelog.Errorf(c, "Failed to fetch user info for %s[%s]: %s", token.Email, token.LocalID, err)
 			return nil
 		}
 		return &User{
@@ -166,7 +167,7 @@ func currentUser(r *http.Request) *User {
 		// Extracts user from current session.
 		v, ok := s.Values[sessionUserKey]
 		if !ok {
-			c.Errorf("no user found in current session")
+			aelog.Errorf(c, "no user found in current session")
 		}
 		return v.(*User)
 	}
@@ -181,7 +182,7 @@ func saveCurrentUser(r *http.Request, w http.ResponseWriter, u *User) {
 	s.Values[sessionUserKey] = *u
 	err := s.Save(r, w)
 	if err != nil {
-		appengine.NewContext(r).Errorf("Cannot save session: %s", err)
+		aelog.Errorf(appengine.NewContext(r), "Cannot save session: %s", err)
 	}
 }
 
@@ -201,7 +202,7 @@ func weekdayForUser(r *http.Request, u *User) time.Weekday {
 	err := datastore.Get(c, k, &d)
 	if err != nil {
 		if err != datastore.ErrNoSuchEntity {
-			c.Errorf("Failed to fetch the favorite weekday for user %+v: %s", *u, err)
+			aelog.Errorf(c, "Failed to fetch the favorite weekday for user %+v: %s", *u, err)
 		}
 		return time.Sunday
 	}
@@ -214,7 +215,7 @@ func updateWeekdayForUser(r *http.Request, u *User, d time.Weekday) {
 	k := datastore.NewKey(c, "FavWeekday", u.ID, 0, nil)
 	_, err := datastore.Put(c, k, &FavWeekday{u.ID, d})
 	if err != nil {
-		c.Errorf("Failed to update the favorite weekday for user %+v: %s", *u, err)
+		aelog.Errorf(c, "Failed to update the favorite weekday for user %+v: %s", *u, err)
 	}
 }
 
@@ -267,7 +268,7 @@ func handleSignOut(w http.ResponseWriter, r *http.Request) {
 	}
 	err := s.Save(r, w)
 	if err != nil {
-		appengine.NewContext(r).Errorf("Cannot save session: %s", err)
+		aelog.Errorf(appengine.NewContext(r), "Cannot save session: %s", err)
 	}
 	// Also clear identity toolkit token.
 	http.SetCookie(w, &http.Cookie{Name: gtokenCookieName, MaxAge: -1})
@@ -280,13 +281,13 @@ func handleOOBAction(w http.ResponseWriter, r *http.Request) {
 	// Create an identity toolkit client associated with the GAE context.
 	client, err := gitkit.NewWithContext(c, gitkitClient)
 	if err != nil {
-		c.Errorf("Failed to create a gitkit.Client with a context: %s", err)
+		aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
 		w.Write([]byte(gitkit.ErrorResponse(err)))
 		return
 	}
 	resp, err := client.GenerateOOBCode(r)
 	if err != nil {
-		c.Errorf("Failed to get an OOB code: %s", err)
+		aelog.Errorf(c, "Failed to get an OOB code: %s", err)
 		w.Write([]byte(gitkit.ErrorResponse(err)))
 		return
 	}
@@ -306,7 +307,7 @@ func handleOOBAction(w http.ResponseWriter, r *http.Request) {
 		msg.HTMLBody = fmt.Sprintf(emailTemplateVerifyEmail, resp.OOBCodeURL.String())
 	}
 	if err := mail.Send(c, msg); err != nil {
-		c.Errorf("Failed to send %s message to user %s: %s", resp.Action, resp.Email, err)
+		aelog.Errorf(c, "Failed to send %s message to user %s: %s", resp.Action, resp.Email, err)
 		w.Write([]byte(gitkit.ErrorResponse(err)))
 		return
 	}
@@ -323,23 +324,23 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 	// Check if there is a signed in user.
 	u := currentUser(r)
 	if u == nil {
-		c.Errorf("No signed in user for updating")
+		aelog.Errorf(c, "No signed in user for updating")
 		goto out
 	}
 	// Validate XSRF token first.
 	if !xsrftoken.Valid(r.PostFormValue(xsrfTokenName), xsrfKey, u.ID, updateURL) {
-		c.Errorf("XSRF token validation failed")
+		aelog.Errorf(c, "XSRF token validation failed")
 		goto out
 	}
 	// Extract the new favorite weekday.
 	d, err = strconv.Atoi(r.PostFormValue(favoriteName))
 	if err != nil {
-		c.Errorf("Failed to extract new favoriate weekday: %s", err)
+		aelog.Errorf(c, "Failed to extract new favoriate weekday: %s", err)
 		goto out
 	}
 	day = time.Weekday(d)
 	if day < time.Sunday || day > time.Saturday {
-		c.Errorf("Got wrong value for favorite weekday: %d", d)
+		aelog.Errorf(c, "Got wrong value for favorite weekday: %d", d)
 	}
 	// Update the favorite weekday.
 	updateWeekdayForUser(r, u, day)
@@ -357,24 +358,24 @@ func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	// Check if there is a signed in user.
 	u := currentUser(r)
 	if u == nil {
-		c.Errorf("No signed in user for updating")
+		aelog.Errorf(c, "No signed in user for updating")
 		goto out
 	}
 	// Validate XSRF token first.
 	if !xsrftoken.Valid(r.PostFormValue(xsrfTokenName), xsrfKey, u.ID, deleteAccountURL) {
-		c.Errorf("XSRF token validation failed")
+		aelog.Errorf(c, "XSRF token validation failed")
 		goto out
 	}
 	// Create an identity toolkit client associated with the GAE context.
 	client, err = gitkit.NewWithContext(c, gitkitClient)
 	if err != nil {
-		c.Errorf("Failed to create a gitkit.Client with a context: %s", err)
+		aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
 		goto out
 	}
 	// Delete account.
 	err = client.DeleteUser(&gitkit.User{LocalID: u.ID})
 	if err != nil {
-		c.Errorf("Failed to delete user %+v: %s", *u, err)
+		aelog.Errorf(c, "Failed to delete user %+v: %s", *u, err)
 		goto out
 	}
 	// Account deletion succeeded. Call sign out to clear session and identity
