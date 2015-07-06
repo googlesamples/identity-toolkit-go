@@ -53,6 +53,10 @@ func main() {
 			Usage: "the service account email address.",
 		},
 		cli.StringFlag{
+			Name:  "server_api_key",
+			Usage: "the server API key.",
+		},
+		cli.StringFlag{
 			Name:  "key_path",
 			Usage: "the PEM encoding private key file path for the service account.",
 		},
@@ -89,6 +93,9 @@ func initClient(c *cli.Context) error {
 	// Command line flags overwrite the values in config file.
 	if c.IsSet("client_id") {
 		config.ClientID = c.String("client_id")
+	}
+	if c.IsSet("server_api_key") {
+		config.ServerAPIKey = c.String("server_api_key")
 	}
 	if c.IsSet("service_account") {
 		config.ServiceAccount = c.String("service_account")
