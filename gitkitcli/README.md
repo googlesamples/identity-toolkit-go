@@ -11,8 +11,9 @@ $ openssl pkcs12 -in <key.p12> -nocerts -passin pass:notasecret -nodes \
 -out <key.pem>
 ```
 
-There are three required configurations by this tool:
+There are four required configurations by this tool:
 - ClientID: the OAuth2 client ID for the web server.
+- ServerAPIKey: the API key for the server to fetch the identitytoolkit public certificates.
 - ServiceAccount: the email address of the service account.
 - PEMKeyPath: the PEM enconding private key file path.
 
@@ -20,6 +21,7 @@ You can provide a JSON configuration file, e.g., config.json:
 ```
 {
   "clientId": "123.apps.googleusercontent.com",
+  "serverApiKey": "server_api_key",
   "serviceAccount": "123-abc@developer.gserviceaccount.com",
   "keyPath": "/dir-of-your-key/private-key.pem"
 }
