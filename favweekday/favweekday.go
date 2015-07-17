@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"code.google.com/p/xsrftoken"
+	"github.com/adg/xsrftoken"
 	"github.com/google/identity-toolkit-go-client/gitkit"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -292,7 +292,7 @@ func handleOOBAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := &mail.Message{
-		Sender: "FavWeekday Support <favweekday.support@example.com>",
+		Sender: "FavWeekday Support <support@favweekday.appspot.com>",
 		To:     []string{resp.Email},
 	}
 	switch resp.Action {
