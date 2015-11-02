@@ -292,18 +292,20 @@ func handleOOBAction(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := &mail.Message{
 		Sender: "FavWeekday Support <support@favweekday.appspot.com>",
-		To:     []string{resp.Email},
 	}
 	switch resp.Action {
 	case gitkit.OOBActionResetPassword:
 		msg.Subject = "Reset your FavWeekday account password"
 		msg.HTMLBody = fmt.Sprintf(emailTemplateResetPassword, resp.Email, resp.OOBCodeURL.String())
+		msg.To = []string{resp.Email}
 	case gitkit.OOBActionChangeEmail:
 		msg.Subject = "FavWeekday account email address change confirmation"
 		msg.HTMLBody = fmt.Sprintf(emailTemplateChangeEmail, resp.Email, resp.NewEmail, resp.OOBCodeURL.String())
+		msg.To = []string{resp.NewEmail}
 	case gitkit.OOBActionVerifyEmail:
 		msg.Subject = "FavWeekday account registration confirmation"
 		msg.HTMLBody = fmt.Sprintf(emailTemplateVerifyEmail, resp.OOBCodeURL.String())
+		msg.To = []string{resp.Email}
 	}
 	if err := mail.Send(c, msg); err != nil {
 		aelog.Errorf(c, "Failed to send %s message to user %s: %s", resp.Action, resp.Email, err)
