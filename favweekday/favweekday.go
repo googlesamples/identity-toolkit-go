@@ -41,7 +41,6 @@ const (
 // Identity toolkit configurations.
 const (
 	browserAPIKey  = "INSERT_YOUR_BROWSER_API_KEY_HERE"
-	serverAPIKey   = "INSERT_YOUR_SERVER_API_KEY_HERE"
 	clientID       = "INSERT_YOUR_SERVER_CLIENT_ID_HERE"
 	serviceAccount = "INSERT_YOUR_SERVICE_ACCOUNT_EMAIL_HERE"
 	privateKeyPath = "INSERT_YOUR_SERVICE_ACCOUNT_PRIVATE_KEY_FILE_PATH_HERE"
@@ -405,9 +404,8 @@ func init() {
 
 	// Create identity toolkit client.
 	c := &gitkit.Config{
-		ServerAPIKey: serverAPIKey,
-		ClientID:     clientID,
-		WidgetURL:    widgetURL,
+		ClientID:  clientID,
+		WidgetURL: widgetURL,
 	}
 	// Service account and private key are not required in GAE Prod.
 	// GAE App Identity API is used to identify the app.
