@@ -2,28 +2,20 @@ This is an example program that demonstrating how to use gitkit.Client. It is
 also helpful for site admins to make API calls to identitytoolkit sevices to
 get/set user account information.
 
-To obtain a private key for the service account, you need to go Google Cloud
-Console and create one service account if you don't have one. The downloaded
-private key is in a PKCS12 encoding file, you can convert it to a PEM encoding
-by openssl:
-```
-$ openssl pkcs12 -in <key.p12> -nocerts -passin pass:notasecret -nodes \
--out <key.pem>
-```
+To obtain a JSON key file for the service account, you need to go Google Cloud
+Console and create one service account if you don't have one. Choose JSON when
+downloading the key.
 
-There are four required configurations by this tool:
+There are two configurations used by this tool:
 - ClientID: the OAuth2 client ID for the web server.
-- ServerAPIKey: the API key for the server to fetch the identitytoolkit public certificates.
-- ServiceAccount: the email address of the service account.
-- PEMKeyPath: the PEM enconding private key file path.
+- GoogleAppCredentialsPath: path to the JSON key file of the service account. if
+  it's absent, Google Application Default is used.
 
 You can provide a JSON configuration file, e.g., config.json:
 ```
 {
   "clientId": "123.apps.googleusercontent.com",
-  "serverApiKey": "server_api_key",
-  "serviceAccount": "123-abc@developer.gserviceaccount.com",
-  "keyPath": "/dir-of-your-key/private-key.pem"
+  "GoogleAppCredentialsPath": "/path/to/json/key/file"
 }
 ```
 
@@ -36,7 +28,7 @@ gitkitcli -config_file=config.json getuser user@example.com
 You can also overwrite a configuration by passing its value from the
 correspoding flag:
 ```
-gitkitcli -config-file=config.json -key_path=/new-key-dir/key.pem createuser
+gitkitcli -config_file=config.json -google_app_credentials_path=/path/to/json/key/file createuser
 ```
 
 If no configuration file is provided through the flag, an environment variable

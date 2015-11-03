@@ -27,6 +27,8 @@ import (
 	"net/mail"
 	"os"
 
+	"golang.org/x/net/context"
+
 	"github.com/codegangsta/cli"
 	"github.com/google/identity-toolkit-go-client/gitkit"
 	"github.com/howeyc/gopass"
@@ -49,12 +51,8 @@ func main() {
 			Usage: "the client ID of the web server.",
 		},
 		cli.StringFlag{
-			Name:  "service_account",
-			Usage: "the service account email address.",
-		},
-		cli.StringFlag{
-			Name:  "key_path",
-			Usage: "the PEM encoding private key file path for the service account.",
+			Name:  "google_app_credentials_path",
+			Usage: "the path of the JSON key file of the Google service account.",
 		},
 	}
 	app.Before = initClient
@@ -90,14 +88,11 @@ func initClient(c *cli.Context) error {
 	if c.IsSet("client_id") {
 		config.ClientID = c.String("client_id")
 	}
-	if c.IsSet("service_account") {
-		config.ServiceAccount = c.String("service_account")
-	}
-	if c.IsSet("key_path") {
-		config.PEMKeyPath = c.String("key_path")
+	if c.IsSet("google_app_credentials_path") {
+		config.GoogleAppCredentialsPath = c.String("google_app_credentials_path")
 	}
 
-	if client, err = gitkit.New(config); err != nil {
+	if client, err = gitkit.New(context.Background(), config); err != nil {
 		return err
 	}
 	return nil
@@ -141,12 +136,13 @@ func failOnError(c *cli.Context, err error) {
 // getUserByIdentifier retrieves the account information specified by the
 // identifier, which could be an email addresss, a local ID or an ID token.
 func getUserByIdentifier(identifier string) (*gitkit.User, error) {
+	ctx := context.Background()
 	if _, err := mail.ParseAddress(identifier); err == nil {
-		return client.UserByEmail(identifier)
-	} else if _, err := client.ValidateToken(identifier); err == nil {
-		return client.UserByToken(identifier)
+		return client.UserByEmail(ctx, identifier)
+	} else if _, err := client.ValidateToken(ctx, identifier); err == nil {
+		return client.UserByToken(ctx, identifier)
 	} else {
-		return client.UserByLocalID(identifier)
+		return client.UserByLocalID(ctx, identifier)
 	}
 }
 
@@ -184,7 +180,7 @@ func commandValidateToken() cli.Command {
 		Description: "Validate the given ID token and print the account information contained in it.",
 		Action: func(c *cli.Context) {
 			failOnError(c, checkOneArgument(c))
-			t, err := client.ValidateToken(c.Args().First())
+			t, err := client.ValidateToken(context.Background(), c.Args().First())
 			failOnError(c, err)
 			fmt.Println(">> token info:")
 			printUser(&gitkit.User{
@@ -248,7 +244,7 @@ func commandUpdateUser() cli.Command {
 			if c.IsSet("email_verified") {
 				u.EmailVerified = c.Bool("email_verified")
 			}
-			failOnError(c, client.UpdateUser(u))
+			failOnError(c, client.UpdateUser(context.Background(), u))
 			if c.IsSet("password") {
 				// If a new password is set, the new PasswordHash need to be retrieved.
 				if u, err = getUserByIdentifier(u.LocalID); err != nil {
@@ -270,7 +266,7 @@ func commandDeleteUser() cli.Command {
 			failOnError(c, checkOneArgument(c))
 			u, err := getUserByIdentifier(c.Args().First())
 			failOnError(c, err)
-			failOnError(c, client.DeleteUser(u))
+			failOnError(c, client.DeleteUser(context.Background(), u))
 			fmt.Println(">> user deleted:")
 			printUser(u)
 		},
@@ -299,7 +295,7 @@ func commandCreateUser() cli.Command {
 			password := string(gopass.GetPasswd())
 			u, err := generateUser(email, password, key, salt)
 			failOnError(c, err)
-			failOnError(c, client.UploadUsers([]*gitkit.User{u}, "HMAC_SHA1", key, nil))
+			failOnError(c, client.UploadUsers(context.Background(), []*gitkit.User{u}, "HMAC_SHA1", key, nil))
 			u, err = getUserByIdentifier(u.Email)
 			failOnError(c, err)
 			fmt.Println(">> user created:")
@@ -347,7 +343,7 @@ func commandUploadUsers() cli.Command {
 				} else {
 					failOnError(c, err)
 				}
-				err = client.UploadUsers(users, c.String("algorithm"), key, separator)
+				err = client.UploadUsers(context.Background(), users, c.String("algorithm"), key, separator)
 				if uploadErr, ok := err.(gitkit.UploadError); ok {
 					for _, v := range uploadErr {
 						fmt.Printf(">> failed to upload user %s: %s\n", users[v.Index].Email, v.Message)
@@ -377,7 +373,8 @@ func commandDownloadUsers() cli.Command {
 				failOnError(c, err)
 				defer f.Close()
 			}
-			l := client.ListUsers()
+			ctx := context.Background()
+			l := client.ListUsers(ctx)
 			maxRetries := 5
 			i := 0
 			for {
@@ -388,7 +385,7 @@ func commandDownloadUsers() cli.Command {
 				}
 				if l.Error != nil && i < maxRetries {
 					i++
-					l.Retry()
+					l.Retry(ctx)
 					continue
 				}
 				break
