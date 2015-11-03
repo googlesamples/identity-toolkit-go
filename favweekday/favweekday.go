@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
+	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	aelog "google.golang.org/appengine/log"
@@ -40,10 +41,9 @@ const (
 
 // Identity toolkit configurations.
 const (
-	browserAPIKey  = "INSERT_YOUR_BROWSER_API_KEY_HERE"
-	clientID       = "INSERT_YOUR_SERVER_CLIENT_ID_HERE"
-	serviceAccount = "INSERT_YOUR_SERVICE_ACCOUNT_EMAIL_HERE"
-	privateKeyPath = "INSERT_YOUR_SERVICE_ACCOUNT_PRIVATE_KEY_FILE_PATH_HERE"
+	browserAPIKey            = "INSERT_YOUR_BROWSER_API_KEY_HERE"
+	clientID                 = "INSERT_YOUR_SERVER_CLIENT_ID_HERE"
+	googleAppCredentialsPath = "INSERT_YOUR_JSON_KEY_FILE_PATH_HERE"
 )
 
 // Cookie/Form input names.
@@ -127,21 +127,14 @@ func currentUser(r *http.Request) *User {
 	c := appengine.NewContext(r)
 	s, _ := cookieStore.Get(r, sessionName)
 	if s.IsNew {
-		// Create an identity toolkit client associated with the GAE context.
-		client, err := gitkit.NewWithContext(c, gitkitClient)
-		if err != nil {
-			aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
-			return nil
-		}
-
 		// Extract the token string from request.
-		ts := client.TokenFromRequest(r)
+		ts := gitkitClient.TokenFromRequest(r)
 		if ts == "" {
 			return nil
 		}
 		// Check the token issue time. Only accept token that is no more than 15
 		// minitues old even if it's still valid.
-		token, err := client.ValidateToken(ts)
+		token, err := gitkitClient.ValidateToken(c, ts)
 		if err != nil {
 			aelog.Errorf(c, "Invalid token %s: %s", ts, err)
 			return nil
@@ -151,7 +144,7 @@ func currentUser(r *http.Request) *User {
 			return nil
 		}
 		// Fetch user info.
-		u, err := client.UserByLocalID(token.LocalID)
+		u, err := gitkitClient.UserByLocalID(c, token.LocalID)
 		if err != nil {
 			aelog.Errorf(c, "Failed to fetch user info for %s[%s]: %s", token.Email, token.LocalID, err)
 			return nil
@@ -277,14 +270,7 @@ func handleSignOut(w http.ResponseWriter, r *http.Request) {
 
 func handleOOBAction(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	// Create an identity toolkit client associated with the GAE context.
-	client, err := gitkit.NewWithContext(c, gitkitClient)
-	if err != nil {
-		aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
-		w.Write([]byte(gitkit.ErrorResponse(err)))
-		return
-	}
-	resp, err := client.GenerateOOBCode(r)
+	resp, err := gitkitClient.GenerateOOBCode(c, r)
 	if err != nil {
 		aelog.Errorf(c, "Failed to get an OOB code: %s", err)
 		w.Write([]byte(gitkit.ErrorResponse(err)))
@@ -352,10 +338,6 @@ out:
 
 func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	var (
-		client *gitkit.Client
-		err    error
-	)
 	// Check if there is a signed in user.
 	u := currentUser(r)
 	if u == nil {
@@ -367,15 +349,8 @@ func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		aelog.Errorf(c, "XSRF token validation failed")
 		goto out
 	}
-	// Create an identity toolkit client associated with the GAE context.
-	client, err = gitkit.NewWithContext(c, gitkitClient)
-	if err != nil {
-		aelog.Errorf(c, "Failed to create a gitkit.Client with a context: %s", err)
-		goto out
-	}
 	// Delete account.
-	err = client.DeleteUser(&gitkit.User{LocalID: u.ID})
-	if err != nil {
+	if err := gitkitClient.DeleteUser(c, &gitkit.User{LocalID: u.ID}); err != nil {
 		aelog.Errorf(c, "Failed to delete user %+v: %s", *u, err)
 		goto out
 	}
@@ -409,14 +384,11 @@ func init() {
 		ClientID:  clientID,
 		WidgetURL: widgetURL,
 	}
-	// Service account and private key are not required in GAE Prod.
-	// GAE App Identity API is used to identify the app.
 	if appengine.IsDevAppServer() {
-		c.ServiceAccount = serviceAccount
-		c.PEMKeyPath = privateKeyPath
+		c.GoogleAppCredentialsPath = googleAppCredentialsPath
 	}
 	var err error
-	gitkitClient, err = gitkit.New(c)
+	gitkitClient, err = gitkit.New(context.Background(), c)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -10,29 +10,19 @@ instructions.
 
 - Provide the following configuration in favweekday.go
   * browserAPIKey
-  * serverAPIKey
   * clientID
-  * serviceAccount
-  * privateKeyPath
 
-The service account private key needs to be PEM encoded. You can convert the
-downloaded `.p12` file to a `.pem` one using `openssl` tool:
-```
-openssl pkcs12 -in <key.p12> -nocerts -passin pass:notasecret -nodes -out <key.pem>
-```
-Note that the service account and private key are needed for running the app in
-dev appserver. If you deploy it to App Engine, they are not required so that
-you can keep the private key in a safe location in your dev environment and
-don't need to upload it.
+You'll need a service account and its JSON key file, which can be created and
+downloaded from Google cloud console, for running the app in dev appserver.
+If you deploy it to App Engine, they are not required so that you can keep the
+JSON key file in a safe location in your dev environment and don't need to
+upload it.
 
 There are also three keys used in this sample app for session cookie
-authentication, encryption and XSRF token signing.
-They are only for demonstration and not secure. Be sure to use real secure keys
-in your prod app.
+authentication, encryption and XSRF token signing. They are only for
+demonstration and not secure. Be sure to use real secure keys in your prod app.
 
-- Run the setup.sh script, which fetches the libraries this sample app needs.
-
-- Run the sample app (assuming your current working directory is `favweekday`).
+Run the sample app (assuming your current working directory is `favweekday`).
 ```
 dev_appserver.py --enable_sendmail=yes .
 ```
