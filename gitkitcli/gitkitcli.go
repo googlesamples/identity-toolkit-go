@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"net/mail"
@@ -69,24 +70,35 @@ func main() {
 }
 
 var client *gitkit.Client
+var clientID string
+
+type CliConfig struct {
+	ClientID string `json:"clientId,omitempty"`
+	GoogleAppCredentialsPath string `json:"googleAppCredentialsPath",omitempty"`
+}
 
 func initClient(c *cli.Context) error {
 	configFile := c.String("config_file")
-	var config *gitkit.Config
+	config := &gitkit.Config{}
 	var err error
 	if configFile != "" {
-		config, err = gitkit.LoadConfig(configFile)
+		var b []byte
+		b, err = ioutil.ReadFile(configFile)
 		if err != nil {
 			return err
 		}
-	} else {
-		config = &gitkit.Config{}
+		var c CliConfig
+		if err = json.Unmarshal(b, &c); err != nil {
+			return err
+		}
+		clientID = c.ClientID
+		config.GoogleAppCredentialsPath = c.GoogleAppCredentialsPath
 	}
 	// It is required but not used.
 	config.WidgetURL = "http://localhost"
 	// Command line flags overwrite the values in config file.
 	if c.IsSet("client_id") {
-		config.ClientID = c.String("client_id")
+		clientID = c.String("client_id")
 	}
 	if c.IsSet("google_app_credentials_path") {
 		config.GoogleAppCredentialsPath = c.String("google_app_credentials_path")
@@ -139,8 +151,8 @@ func getUserByIdentifier(identifier string) (*gitkit.User, error) {
 	ctx := context.Background()
 	if _, err := mail.ParseAddress(identifier); err == nil {
 		return client.UserByEmail(ctx, identifier)
-	} else if _, err := client.ValidateToken(ctx, identifier); err == nil {
-		return client.UserByToken(ctx, identifier)
+	} else if _, err := client.ValidateToken(ctx, identifier, clientID); err == nil {
+		return client.UserByToken(ctx, identifier, clientID)
 	} else {
 		return client.UserByLocalID(ctx, identifier)
 	}
@@ -180,7 +192,7 @@ func commandValidateToken() cli.Command {
 		Description: "Validate the given ID token and print the account information contained in it.",
 		Action: func(c *cli.Context) {
 			failOnError(c, checkOneArgument(c))
-			t, err := client.ValidateToken(context.Background(), c.Args().First())
+			t, err := client.ValidateToken(context.Background(), c.Args().First(), clientID)
 			failOnError(c, err)
 			fmt.Println(">> token info:")
 			printUser(&gitkit.User{
