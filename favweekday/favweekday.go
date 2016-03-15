@@ -11,12 +11,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/adg/xsrftoken"
 	"github.com/google/identity-toolkit-go-client/gitkit"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/xsrftoken"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	aelog "google.golang.org/appengine/log"
