@@ -134,7 +134,7 @@ func currentUser(r *http.Request) *User {
 		}
 		// Check the token issue time. Only accept token that is no more than 15
 		// minitues old even if it's still valid.
-		token, err := gitkitClient.ValidateToken(c, ts, clientID)
+		token, err := gitkitClient.ValidateToken(c, ts, []string{clientID})
 		if err != nil {
 			aelog.Errorf(c, "Invalid token %s: %s", ts, err)
 			return nil
