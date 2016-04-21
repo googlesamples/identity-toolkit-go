@@ -73,7 +73,7 @@ var client *gitkit.Client
 var clientID string
 
 type CliConfig struct {
-	ClientID string `json:"clientId,omitempty"`
+	ClientID                 string `json:"clientId,omitempty"`
 	GoogleAppCredentialsPath string `json:"googleAppCredentialsPath",omitempty"`
 }
 
@@ -151,8 +151,8 @@ func getUserByIdentifier(identifier string) (*gitkit.User, error) {
 	ctx := context.Background()
 	if _, err := mail.ParseAddress(identifier); err == nil {
 		return client.UserByEmail(ctx, identifier)
-	} else if _, err := client.ValidateToken(ctx, identifier, clientID); err == nil {
-		return client.UserByToken(ctx, identifier, clientID)
+	} else if _, err := client.ValidateToken(ctx, identifier, []string{clientID}); err == nil {
+		return client.UserByToken(ctx, identifier, []string{clientID})
 	} else {
 		return client.UserByLocalID(ctx, identifier)
 	}
@@ -192,7 +192,7 @@ func commandValidateToken() cli.Command {
 		Description: "Validate the given ID token and print the account information contained in it.",
 		Action: func(c *cli.Context) {
 			failOnError(c, checkOneArgument(c))
-			t, err := client.ValidateToken(context.Background(), c.Args().First(), clientID)
+			t, err := client.ValidateToken(context.Background(), c.Args().First(), []string{clientID})
 			failOnError(c, err)
 			fmt.Println(">> token info:")
 			printUser(&gitkit.User{
@@ -248,9 +248,10 @@ func commandUpdateUser() cli.Command {
 			}
 			if c.IsSet("password") {
 				fmt.Print("New password: ")
-				password := string(gopass.GetPasswd())
-				if password != "" {
-					u.Password = password
+				password, err := gopass.GetPasswd()
+				failOnError(c, err)
+				if len(password) > 0 {
+					u.Password = string(password)
 				}
 			}
 			if c.IsSet("email_verified") {
@@ -304,8 +305,9 @@ func commandCreateUser() cli.Command {
 			var email string
 			fmt.Scanf("%s\n", &email)
 			fmt.Print("Password: ")
-			password := string(gopass.GetPasswd())
-			u, err := generateUser(email, password, key, salt)
+			password, err := gopass.GetPasswd()
+			failOnError(c, err)
+			u, err := generateUser(email, string(password), key, salt)
 			failOnError(c, err)
 			failOnError(c, client.UploadUsers(context.Background(), []*gitkit.User{u}, "HMAC_SHA1", key, nil))
 			u, err = getUserByIdentifier(u.Email)
